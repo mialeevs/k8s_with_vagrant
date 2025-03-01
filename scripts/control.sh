@@ -149,30 +149,32 @@ data:
   ip_autodetection_method: "interface=eth1"
 EOF
 
-   kubectl apply -f "/vagrant/calico-config.yaml"
+  kubectl apply -f "/vagrant/calico-config.yaml"
 
-   echo "INFO: Downloading Calico manifest..."
-   curl -L https://raw.githubusercontent.com/projectcalico/calico/v${CALICO_VERSION}/manifests/calico.yaml \
-      -o "/vagrant/calico.yaml"
+  echo "INFO: Downloading Calico manifest..."
+  curl -L https://raw.githubusercontent.com/projectcalico/calico/v${CALICO_VERSION}/manifests/calico.yaml \
+    -o "/vagrant/calico.yaml"
 
-   sed -i "s#192.168.0.0/16#${POD_CIDR}#g" "/vagrant/calico.yaml"
-   sed -i '/name: CALICO_IPV4POOL_CIDR/a\            - name: IP_AUTODETECTION_METHOD\n              value: "interface=eth1"' "/vagrant/calico.yaml"
+  sed -i "s#192.168.0.0/16#${POD_CIDR}#g" "/vagrant/calico.yaml"
+  sed -i '/name: CALICO_IPV4POOL_CIDR/a\            - name: IP_AUTODETECTION_METHOD\n              value: "interface=eth1"' "/vagrant/calico.yaml"
 
-   echo "INFO: Applying Calico manifest..."
-   kubectl apply -f "/vagrant/calico.yaml"
+  echo "INFO: Applying Calico manifest..."
+  kubectl apply -f "/vagrant/calico.yaml"
 
-   echo "INFO: Waiting for CoreDNS to be ready..."
-   wait_for_pods "kube-system" "k8s-app=kube-dns"
+  echo "INFO: Waiting for CoreDNS to be ready..."
+  wait_for_pods "kube-system" "k8s-app=kube-dns"
 
-   echo "INFO: Waiting for Calico to be ready..."
-   wait_for_pods "kube-system" "k8s-app=calico-node"
+  echo "INFO: Waiting for Calico to be ready..."
+  wait_for_pods "kube-system" "k8s-app=calico-node"
 
-   echo "INFO: Verifying cluster status..."
-   kubectl get nodes -o wide
-   kubectl get pods --all-namespaces
+  echo "INFO: Verifying cluster status..."
+  kubectl get nodes -o wide
+  kubectl get pods --all-namespaces
 
-   kubeadm token create --print-join-command > /vagrant/configs/join.sh
-   chmod +x /vagrant/configs/join.sh
+  kubeadm token create --print-join-command > /vagrant/configs/join.sh
+  chmod +x /vagrant/configs/join.sh
+  sleep 5
+  kubectl apply -f https://raw.githubusercontent.com/mialeevs/kubernetes_installation_docker/refs/heads/master/metrics-server.yaml
 }
 
 install_tools(){
@@ -198,6 +200,7 @@ install_argocd(){
   kubectl patch svc argocd-server -n argocd -p '{"spec":{"type":"NodePort"}}'
   kubectl patch svc argocd-server -n argocd --type='json' -p='[{"op": "replace", "path": "/spec/ports/0/nodePort", "value": 30903}]'
   kubectl patch svc argocd-server -n argocd --type='json' -p='[{"op": "replace", "path": "/spec/ports/1/nodePort", "value": 30904}]'
+  sleep 5
 }
 
 }

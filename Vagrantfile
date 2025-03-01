@@ -1,14 +1,9 @@
-# -*- mode: ruby -*-
-# vi: set ft=ruby :
-
 require 'yaml'
 require 'fileutils'
 require 'open3'
 
-# Custom error class for Vagrant configuration
 class VagrantConfigError < StandardError; end
 
-# Load and validate settings
 def load_settings
   settings_file = 'settings.yaml'
   raise VagrantConfigError, "Settings file '#{settings_file}' not found!" unless File.exist?(settings_file)
@@ -20,31 +15,16 @@ def load_settings
   end
 end
 
-# Main Vagrant configuration
 Vagrant.configure('2') do |config|
-  # Load configuration
   settings = load_settings
 
-  # Ensure the hostmanager plugin is present if needed
-  if Vagrant.has_plugin?("vagrant-hostmanager")
-    config.hostmanager.enabled = settings.dig('hostmanager', 'enabled')
-    config.hostmanager.manage_host = settings.dig('hostmanager', 'manage_host')
-    config.hostmanager.manage_guest = settings.dig('hostmanager', 'manage_guest')
-  end
-
-  # Global VM provider settings
   config.vm.provider 'virtualbox' do |vb|
-    # vb.memory = settings['nodes']['default']['memory']
-    # vb.cpus = settings['nodes']['default']['cpu']
-
-    # Security settings
     vb.customize ['modifyvm', :id, '--clipboard-mode', 'disabled']
     vb.customize ['modifyvm', :id, '--drag-and-drop', 'disabled']
     vb.customize ['modifyvm', :id, '--audio', 'none']
     vb.customize ['modifyvm', :id, '--usb', 'off']
     vb.customize ['modifyvm', :id, '--vrde', 'off']
 
-    # CPU and Memory optimizations
     vb.customize ['modifyvm', :id, '--hwvirtex', 'on']
     vb.customize ['modifyvm', :id, '--vtxvpid', 'on']
     vb.customize ['modifyvm', :id, '--vtxux', 'on']
@@ -53,11 +33,9 @@ Vagrant.configure('2') do |config|
     vb.customize ['modifyvm', :id, '--nestedpaging', 'on']
     vb.customize ['modifyvm', :id, '--pagefusion', 'off']
 
-    # I/O optimizations
     vb.customize ['storagectl', :id, '--name', 'SATA Controller', '--hostiocache', 'on']
   end
 
-  # Box configuration with architecture detection (for cross-platform compatibility)
   config.vm.box = if `uname -m`.strip == 'aarch64'
     "#{settings['software']['box']}-arm64"
   else
@@ -66,23 +44,21 @@ Vagrant.configure('2') do |config|
 
   config.vm.box_check_update = true
 
-  # Disable default shared folder
   config.vm.synced_folder '.', '/vagrant', disabled: true
 
-  # Secure shared folder configuration
   config.vm.synced_folder './configs', '/vagrant/configs',
     owner: 'vagrant',
     group: 'vagrant',
     mount_options: ['dmode=750,fmode=640'],
     create: true
 
-  # Control plane node configuration
   config.vm.define 'control-plane', primary: true do |control|
     control.vm.hostname = 'control-node'
+    control.vm.boot_timeout = 1500
 
-    # Network configuration
     control.vm.network 'public_network',
       ip: settings['network']['control_ip'],
+      bridge: settings['network']['bridge_interface'],
       netmask: settings['network']['netmask'],
       nic_type: 'virtio'
 
@@ -91,12 +67,10 @@ Vagrant.configure('2') do |config|
       virtualbox__intnet: 'cluster_internal',
       nic_type: 'virtio'
 
-    # VirtualBox provider settings
     control.vm.provider 'virtualbox' do |vb|
       vb.memory = settings['nodes']['control']['memory']
       vb.cpus = settings['nodes']['control']['cpu']
 
-      # Storage configuration
       disk_path = 'control_plane_disk.vdi'
       unless File.exist?(disk_path)
         vb.customize ['createhd', '--filename', disk_path, '--size', settings['nodes']['control']['disk_size'], '--variant', 'Fixed']
@@ -104,7 +78,6 @@ Vagrant.configure('2') do |config|
       end
     end
 
-    # Provisioning
     control.vm.provision 'shell',
       env: {
         'DNS_SERVERS' => settings['network']['dns_servers'].join(','),
@@ -126,14 +99,14 @@ Vagrant.configure('2') do |config|
       path: 'scripts/control.sh'
   end
 
-  # Worker nodes configuration
   (1..settings['nodes']['workers']['count']).each do |i|
     config.vm.define "worker#{i}" do |worker|
       worker.vm.hostname = "worker-node#{i}"
+      worker.vm.boot_timeout = 1500
 
-      # Network configuration
       worker.vm.network 'public_network',
         ip: "#{settings['network']['worker_ip_prefix']}.#{i + 10}",
+        bridge: settings['network']['bridge_interface'],
         netmask: settings['network']['netmask'],
         nic_type: 'virtio'
 
@@ -146,7 +119,6 @@ Vagrant.configure('2') do |config|
         vb.memory = settings['nodes']['workers']['memory']
         vb.cpus = settings['nodes']['workers']['cpu']
 
-        # Storage configuration
         disk_path = "worker#{i}_disk.vdi"
         unless File.exist?(disk_path)
           vb.customize ['createhd', '--filename', disk_path, '--size', settings['nodes']['workers']['disk_size'], '--variant', 'Fixed']
@@ -154,7 +126,6 @@ Vagrant.configure('2') do |config|
         end
       end
 
-      # Provisioning
       worker.vm.provision 'shell',
         env: {
           'DNS_SERVERS' => settings['network']['dns_servers'].join(','),
@@ -170,7 +141,6 @@ Vagrant.configure('2') do |config|
     end
   end
 
-  # Post-setup health check
   config.trigger.after [:up, :reload] do |trigger|
     trigger.name = "Verifying cluster health"
     trigger.ruby do |env, machine|
