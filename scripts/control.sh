@@ -133,6 +133,12 @@ EOF
    echo "alias c=clear" >> ~/.bashrc
    echo "alias ud='sudo apt update -y && sudo apt upgrade -y'" >> ~/.bashrc
 
+   echo "source <(kubectl completion bash)" >> /home/vagrant/.bashrc
+   echo "complete -F __start_kubectl k" >> /home/vagrant/.bashrc
+   echo "alias k=kubectl" >> /home/vagrant/.bashrc
+   echo "alias c=clear" >> /home/vagrant/.bashrc
+   echo "alias ud='sudo apt update -y && sudo apt upgrade -y'" >> /home/vagrant/.bashrc
+
 
 
 install_calico() {
