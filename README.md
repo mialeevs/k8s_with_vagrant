@@ -1,4 +1,4 @@
-# Kubernetes Installation on Ubuntu 22.04 with VAGRANT
+# Kubernetes Installation on Ubuntu 24.04/Windows 11 with VAGRANT
 
 ## For Linux OS / Windows 10/11 OS
 
