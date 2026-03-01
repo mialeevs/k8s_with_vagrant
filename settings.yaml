@@ -1,17 +1,15 @@
-cluster_name: Kubernetes-VBox-Cluster
+cluster_name: Kubernetes-Parallels-Cluster
 environment: development
 
 network:
   dns_servers:
-    - 9.9.9.11
+    - 9.9.9.9
     - 1.1.1.1
   pod_cidr: 10.244.0.0/16
   service_cidr: 10.96.0.0/12
   control_ip: 192.168.1.100
   worker_ip_prefix: 192.168.1
-  private_ip_prefix: 172.16.0
-  bridge_interface: "eth0"
-  netmask: "255.255.255.0"
+  worker_start_ip: 11
 
 nodes:
   control:
@@ -24,10 +22,10 @@ nodes:
 
 software:
   box: bento/ubuntu-24.04
+  kubernetes: v1.32
+  crio: v1.32
   calico: 3.28.2
-  kubernetes: v1.31
   os: xUbuntu_24.04
-  crio: v1.30
 
 shared_folders:
   - host_path: ./configs

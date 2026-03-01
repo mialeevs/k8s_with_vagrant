@@ -209,7 +209,6 @@ install_argocd(){
   sleep 5
 }
 
-}
 main() {
    log "INFO" "Starting control plane setup..."
    initialize_control_plane

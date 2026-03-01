@@ -117,15 +117,43 @@ EOF
 install_crio() {
     log "INFO" "Installing CRI-O version ${CRIO_VERSION}..."
     
-    # Use Ubuntu 22.04 repositories for compatibility
-    OS="xUbuntu_22.04"
+    # Install prerequisites
+    log "INFO" "Installing prerequisites..."
+    apt-get update
+    apt-get install -y apt-transport-https ca-certificates curl gpg
     
-    sudo mkdir -p /etc/apt/keyrings
-curl -fsSL "https://pkgs.k8s.io/addons:/cri-o:/stable:/$CRIO_VERSION/deb/Release.key" | \
-    sudo gpg --dearmor -o /etc/apt/keyrings/cri-o-apt-keyring.gpg
+    # Create keyrings directory
+    sudo mkdir -p -m 755 /etc/apt/keyrings
 
-echo "deb [signed-by=/etc/apt/keyrings/cri-o-apt-keyring.gpg] https://pkgs.k8s.io/addons:/cri-o:/stable:/$CRIO_VERSION/deb/ /" | \
-    sudo tee /etc/apt/sources.list.d/cri-o.list
+    # Retry mechanism for downloading GPG key
+    local max_attempts=5
+    local attempt=1
+    local success=false
+
+    while [ $attempt -le $max_attempts ] && [ "$success" = false ]; do
+        log "INFO" "Attempting to download CRI-O GPG key (attempt $attempt/$max_attempts)..."
+        
+        if curl -fsSL "https://pkgs.k8s.io/addons:/cri-o:/stable:/${CRIO_VERSION}/deb/Release.key" | \
+            sudo gpg --dearmor -o /etc/apt/keyrings/cri-o-apt-keyring.gpg; then
+            success=true
+            log "INFO" "Successfully downloaded CRI-O GPG key"
+        else
+            log "WARN" "Failed to download CRI-O GPG key (attempt $attempt/$max_attempts)"
+            if [ $attempt -lt $max_attempts ]; then
+                sleep $((attempt * 5))
+            fi
+        fi
+        attempt=$((attempt + 1))
+    done
+
+    if [ "$success" = false ]; then
+        log "ERROR" "Failed to download CRI-O GPG key after $max_attempts attempts"
+        log "ERROR" "Please check your internet connection and DNS settings"
+        exit 1
+    fi
+
+    echo "deb [signed-by=/etc/apt/keyrings/cri-o-apt-keyring.gpg] https://pkgs.k8s.io/addons:/cri-o:/stable:/${CRIO_VERSION}/deb/ /" | \
+        sudo tee /etc/apt/sources.list.d/cri-o.list
 
     # Install CRI-O with retry mechanism
     for i in {1..5}; do
@@ -197,16 +225,46 @@ EOF
 install_kubernetes() {
     log "INFO" "Installing Kubernetes version ${KUBERNETES_VERSION}..."
 
-    # Extract the major.minor version for repository
-    KUBE_VERSION_MM=$(echo "${KUBERNETES_VERSION}" | cut -d. -f1-2)
+    # Install prerequisites
+    log "INFO" "Installing prerequisites..."
+    apt-get update
+    apt-get install -y apt-transport-https ca-certificates curl gpg
     
-    # Add Kubernetes repository
-    # Install Kubernetes
-    curl -fsSL "https://pkgs.k8s.io/core:/stable:/$KUBERNETES_VERSION/deb/Release.key" | \
-        sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+    # Create keyrings directory with proper permissions
+    sudo mkdir -p -m 755 /etc/apt/keyrings
+    
+    # Retry mechanism for downloading GPG key
+    local max_attempts=5
+    local attempt=1
+    local success=false
 
-    echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/$KUBERNETES_VERSION/deb/ /" | \
+    # Add Kubernetes apt repository
+    echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/${KUBERNETES_VERSION}/deb/ /" | \
         sudo tee /etc/apt/sources.list.d/kubernetes.list
+
+    while [ $attempt -le $max_attempts ] && [ "$success" = false ]; do
+        log "INFO" "Attempting to download Kubernetes GPG key (attempt $attempt/$max_attempts)..."
+        
+
+        if curl -fsSL "https://pkgs.k8s.io/core:/stable:/${KUBERNETES_VERSION}/deb/Release.key" | \
+            sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg; then
+            success=true
+            log "INFO" "Successfully downloaded Kubernetes GPG key"
+        else
+            log "WARN" "Failed to download Kubernetes GPG key (attempt $attempt/$max_attempts)"
+            if [ $attempt -lt $max_attempts ]; then
+                sleep $((attempt * 5))
+            fi
+        fi
+        attempt=$((attempt + 1))
+    done
+
+    if [ "$success" = false ]; then
+        log "ERROR" "Failed to download Kubernetes GPG key after $max_attempts attempts"
+        log "ERROR" "Please check your internet connection and DNS settings"
+        exit 1
+    fi
+
 
     # Install Kubernetes packages with retry
     for i in {1..5}; do
