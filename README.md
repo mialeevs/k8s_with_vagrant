@@ -1,37 +1,28 @@
-# Kubernetes Installation on Ubuntu 24.04/Windows 11 with VAGRANT
+# Kubernetes Cluster on macOS with Vagrant and Parallels
 
-A production-ready Kubernetes cluster setup using Vagrant, CRI-O runtime, and Calico networking. Includes ArgoCD, Helm, AWS CLI, and metrics server pre-installed.
+A production-ready Kubernetes cluster setup using Vagrant, Parallels Desktop, CRI-O runtime, and Calico networking. Includes ArgoCD and Helm pre-installed.
 
 ## Prerequisites
 
 ### Required Software
 
-Install the following on your laptop or PC:
+Install the following on your Mac:
 
-> [VMWare Workstation](https://access.broadcom.com/default/ui/v1/signin/) or [Parallels Desktop](https://www.parallels.com/) (for macOS)
+> [Parallels Desktop](https://www.parallels.com/)
 
 > [Vagrant](https://www.vagrantup.com/) - Version 2.3.0 or higher
 
 > [GIT](https://git-scm.com/)
-
-> [VMWare Desktop Plugin](https://developer.hashicorp.com/vagrant/docs/providers/vmware/vagrant-vmware-utility) (for VMware users)
 
 ### System Requirements
 
 - Host Machine: 16GB RAM minimum (recommended: 32GB)
 - Disk Space: 50GB free space
 - CPU: 4+ cores recommended
-- OS: Windows 10/11, macOS, or Linux
+- OS: macOS
 
-### Install Vagrant Plugins
+### Install Vagrant Plugin
 
-For VMware users:
-```bash
-vagrant plugin install vagrant-vmware-desktop
-vagrant plugin install vagrant-hostmanager
-```
-
-For Parallels users (macOS):
 ```bash
 vagrant plugin install vagrant-parallels
 ```
@@ -67,33 +58,38 @@ nodes:
 ### 3. Start the Cluster
 
 ```bash
-vagrant up
+make up
 ```
 
 This will:
-- Provision 1 control plane node + N worker nodes
-- Install Kubernetes v1.30 with CRI-O runtime
-- Deploy Calico CNI
-- Install ArgoCD, Helm, AWS CLI, and metrics server
-- Configure the cluster and join worker nodes
+1. Validate `settings.yaml` configuration
+2. Create all VMs in parallel (control plane + workers simultaneously)
+3. Provision the control plane first (Kubernetes init, Calico, ArgoCD, Helm)
+4. Provision each worker node sequentially (join cluster, install node exporter)
 
 Initial setup takes 10-15 minutes depending on your internet speed.
+
+### 4. List All Available Commands
+
+```bash
+make help
+```
 
 ## Accessing the Cluster
 
 ### From Control Plane Node
 
 ```bash
-vagrant ssh control-plane
+make ssh-control
 kubectl get nodes
 kubectl get pods -A
 ```
 
 ### From Host Machine
 
-Copy kubeconfig from control plane:
+Export kubeconfig to your host:
 ```bash
-vagrant ssh control-plane -c "sudo cat /etc/kubernetes/admin.conf" > ~/.kube/config-vagrant
+make kubeconfig
 export KUBECONFIG=~/.kube/config-vagrant
 kubectl get nodes
 ```
@@ -101,15 +97,13 @@ kubectl get nodes
 ## Installed Components
 
 ### Core Components
-- **Kubernetes**: v1.30
-- **Container Runtime**: CRI-O v1.30
+- **Kubernetes**: v1.34
+- **Container Runtime**: CRI-O v1.35
 - **CNI**: Calico v3.28.2
-- **Metrics Server**: Latest
 
 ### Additional Tools
 - **ArgoCD**: v2.13.2 (GitOps)
 - **Helm**: v3 (Package Manager)
-- **AWS CLI**: v2 (Cloud Integration)
 
 ## ArgoCD Access
 
@@ -122,8 +116,7 @@ https://192.168.1.100:30904
 
 ### Get Initial Admin Password
 ```bash
-vagrant ssh control-plane
-kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
+make argocd-password
 ```
 
 ### Login Credentials
@@ -134,30 +127,40 @@ kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.pas
 
 ### Check Cluster Status
 ```bash
-vagrant ssh control-plane -c "kubectl get nodes -o wide"
-vagrant ssh control-plane -c "kubectl get pods -A"
+make status
+make pods
+make nodes
+```
+
+### Validate Cluster Health
+```bash
+make validate
 ```
 
 ### Restart Cluster
 ```bash
-vagrant reload
+make reload
 ```
 
 ### Stop Cluster
 ```bash
-vagrant halt
+make down
 ```
 
 ### Destroy Cluster
 ```bash
-vagrant destroy -f
+make destroy
+```
+
+### Full Cleanup (remove all generated files)
+```bash
+make clean
 ```
 
 ### SSH to Nodes
 ```bash
-vagrant ssh control-plane
-vagrant ssh worker1
-vagrant ssh worker2  # if you have multiple workers
+make ssh-control
+make ssh-worker
 ```
 
 ## Network Configuration
@@ -176,18 +179,17 @@ Modify these in `settings.yaml` if they conflict with your network.
 
 1. Check Vagrant status:
 ```bash
-vagrant status
+make status
 ```
 
 2. View provisioning logs:
 ```bash
-vagrant ssh control-plane -c "sudo cat /var/log/k8s-setup.log"
-vagrant ssh control-plane -c "sudo cat /var/log/k8s-control-setup.log"
+make logs-control
 ```
 
 3. Check worker logs:
 ```bash
-vagrant ssh worker1 -c "sudo cat /var/log/k8s-worker-setup.log"
+make logs-worker
 ```
 
 ### Nodes Not Joining
@@ -199,42 +201,43 @@ cat configs/join.sh
 
 2. Manually join a worker:
 ```bash
-vagrant ssh worker1
+make ssh-worker
 sudo bash /vagrant/configs/join.sh
 ```
 
 3. Check network connectivity:
 ```bash
-vagrant ssh worker1 -c "ping -c 3 192.168.1.100"
+make ssh-worker
+ping -c 3 192.168.1.100
 ```
 
 ### Pods Not Starting
 
 1. Check pod status:
 ```bash
-vagrant ssh control-plane -c "kubectl describe pod <pod-name> -n <namespace>"
+make ssh-control
+kubectl describe pod <pod-name> -n <namespace>
 ```
 
 2. Check CRI-O status:
 ```bash
-vagrant ssh control-plane -c "sudo systemctl status crio"
+make ssh-control
+sudo systemctl status crio
 ```
 
 3. Verify Calico is running:
 ```bash
-vagrant ssh control-plane -c "kubectl get pods -n kube-system -l k8s-app=calico-node"
+make ssh-control
+kubectl get pods -n kube-system -l k8s-app=calico-node
 ```
 
 ### DNS Issues
 
 If pods can't resolve DNS:
 ```bash
-vagrant ssh control-plane -c "kubectl get pods -n kube-system -l k8s-app=kube-dns"
-```
-
-Check CoreDNS logs:
-```bash
-vagrant ssh control-plane -c "kubectl logs -n kube-system -l k8s-app=kube-dns"
+make ssh-control
+kubectl get pods -n kube-system -l k8s-app=kube-dns
+kubectl logs -n kube-system -l k8s-app=kube-dns
 ```
 
 ### Memory/Resource Issues
@@ -243,7 +246,7 @@ If nodes are running out of resources:
 1. Increase memory in `settings.yaml`
 2. Reload the cluster:
 ```bash
-vagrant reload
+make reload
 ```
 
 ## Customization
@@ -253,8 +256,8 @@ vagrant reload
 Edit `settings.yaml`:
 ```yaml
 software:
-  kubernetes: v1.30  # Change to v1.29, v1.31, etc.
-  crio: v1.30        # Must match Kubernetes major.minor version
+  kubernetes: v1.34  # Change to desired version
+  crio: v1.35        # Should match or be compatible with Kubernetes version
 ```
 
 ### Add More Workers
@@ -268,7 +271,7 @@ nodes:
 
 Then run:
 ```bash
-vagrant up
+make up
 ```
 
 ### Modify Resource Allocation
@@ -286,23 +289,24 @@ nodes:
 
 ## Useful Aliases
 
-The following aliases are pre-configured on all nodes:
+The following aliases are pre-configured on the control plane node:
 - `k` = `kubectl`
 - `c` = `clear`
-- `ud` = `sudo apt update -y && sudo apt upgrade -y`
 
 ## Project Structure
 
 ```
 .
+├── Makefile              # Command interface (run make help)
 ├── Vagrantfile           # Main Vagrant configuration
 ├── settings.yaml         # Cluster configuration
 ├── scripts/
-│   ├── common.sh        # Common setup for all nodes
-│   ├── control.sh       # Control plane specific setup
-│   └── node.sh          # Worker node specific setup
+│   ├── common.sh         # Common setup for all nodes
+│   ├── control.sh        # Control plane specific setup
+│   ├── node.sh           # Worker node specific setup
+│   └── validate-settings.sh  # Pre-flight settings validation
 └── configs/
-    └── join.sh          # Auto-generated cluster join command
+    └── join.sh           # Auto-generated cluster join command
 ```
 
 ## Contributing
