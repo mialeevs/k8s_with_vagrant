@@ -110,12 +110,19 @@ kubectl get nodes
 
 ## ArgoCD Access
 
-ArgoCD is pre-installed and exposed via NodePort.
+ArgoCD is pre-installed and exposed via NodePort on the control plane.
 
-### Access URL
+### Port-Forward to Your Mac
+```bash
+make argocd-ui
 ```
+This opens an SSH tunnel so you can access ArgoCD at:
+```
+https://localhost:8443
+
 https://192.168.1.100:30904
 ```
+Press `Ctrl+C` to stop the tunnel.
 
 ### Get Initial Admin Password
 ```bash
