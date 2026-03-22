@@ -1,6 +1,6 @@
 .PHONY: help up down destroy reload status ssh-control ssh-worker \
        logs-control logs-worker pods nodes validate clean kubeconfig \
-       argocd-password info
+       argocd-password argocd-ui info
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -79,3 +79,8 @@ kubeconfig: ## Export kubeconfig to host
 	@chmod 600 ~/.kube/config-vagrant
 	@echo "Kubeconfig exported to ~/.kube/config-vagrant"
 	@echo "Use: export KUBECONFIG=~/.kube/config-vagrant"
+
+argocd-ui: ## Port-forward ArgoCD UI to https://localhost:8443
+	@echo "ArgoCD UI available at: https://localhost:8443"
+	@echo "Press Ctrl+C to stop"
+	vagrant ssh control-plane -- -L 8443:127.0.0.1:30904 -N

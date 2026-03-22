@@ -60,7 +60,7 @@ join_cluster() {
 
     log "INFO" "Joining Kubernetes cluster..."
 
-    chmod 700 "${CONFIG_PATH}/join.sh"
+    chmod 755 "${CONFIG_PATH}/join.sh"
 
     local attempt=1
     while [ $attempt -le $MAX_RETRIES ]; do
@@ -128,6 +128,7 @@ main() {
     install_node_exporter
 
     log "INFO" "Worker node setup completed successfully"
+    chmod 644 "${SETUP_LOG}"
 }
 
 main "$@"

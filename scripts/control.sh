@@ -136,7 +136,7 @@ EOF
     log "INFO" "Generating worker join script..."
     mkdir -p "${CONFIG_PATH}"
     kubeadm token create --print-join-command > "${CONFIG_PATH}/join.sh"
-    chmod 700 "${CONFIG_PATH}/join.sh"
+    chmod 755 "${CONFIG_PATH}/join.sh"
 
     cat >> /home/vagrant/.bashrc <<'EOF'
 source <(kubectl completion bash)
@@ -170,7 +170,7 @@ install_tools() {
 
     # ArgoCD CLI
     wget -q https://github.com/argoproj/argo-cd/releases/download/v2.13.2/argocd-linux-amd64 -O "${TEMP_DIR}/argocd"
-    install -m 750 "${TEMP_DIR}/argocd" /usr/local/bin/argocd
+    install -m 755 "${TEMP_DIR}/argocd" /usr/local/bin/argocd
 }
 
 install_argocd() {
@@ -190,6 +190,7 @@ main() {
     install_tools
     install_argocd
     log "INFO" "Control plane setup completed successfully"
+    chmod 644 "${SETUP_LOG}"
 }
 
 main "$@"

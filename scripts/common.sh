@@ -158,6 +158,7 @@ main() {
     install_kubernetes
 
     log "INFO" "Node setup completed successfully"
+    chmod 644 "$SETUP_LOG"
 }
 
 main "$@"
