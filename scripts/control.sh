@@ -107,14 +107,18 @@ networking:
   dnsDomain: "cluster.local"
 apiServer:
   extraArgs:
-    authorization-mode: "Node,RBAC"
-    enable-admission-plugins: "NodeRestriction"
+    - name: "authorization-mode"
+      value: "Node,RBAC"
+    - name: "enable-admission-plugins"
+      value: "NodeRestriction"
 controllerManager:
   extraArgs:
-    bind-address: "127.0.0.1"
+    - name: "bind-address"
+      value: "127.0.0.1"
 scheduler:
   extraArgs:
-    bind-address: "127.0.0.1"
+    - name: "bind-address"
+      value: "127.0.0.1"
 EOF
 
     kubeadm config images pull --config "${TEMP_DIR}/kubeadm-config.yaml"
