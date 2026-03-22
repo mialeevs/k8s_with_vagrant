@@ -21,8 +21,7 @@ Vagrant.configure("2") do |config|
   Array(settings["shared_folders"]).each do |folder|
     config.vm.synced_folder folder["host_path"], folder["vm_path"],
       owner: folder["owner"],
-      group: folder["group"],
-      mount_options: folder["mount_options"]
+      group: folder["group"]
   end
 
   # =========================
@@ -39,15 +38,11 @@ Vagrant.configure("2") do |config|
       prl.update_guest_tools = true
     end
 
-    node.vm.communicator = "ssh"
-
     node.vm.provision 'shell',
       env: {
         'DNS_SERVERS'        => Array(settings.dig('network', 'dns_servers')).join(','),
-        'ENVIRONMENT'        => settings['environment'],
         'KUBERNETES_VERSION' => settings['software']['kubernetes'],
         'CRIO_VERSION'       => settings['software']['crio'],
-        'OS'                 => settings['software']['os'],
         'SETUP_LOG'          => '/var/log/k8s-setup.log'
       },
       path: 'scripts/common.sh'
@@ -84,40 +79,17 @@ Vagrant.configure("2") do |config|
         prl.update_guest_tools = true
       end
 
-      node.vm.communicator = "ssh"
-
       node.vm.provision 'shell',
         env: {
           'DNS_SERVERS'        => Array(settings.dig('network', 'dns_servers')).join(','),
-          'ENVIRONMENT'        => settings['environment'],
           'KUBERNETES_VERSION' => settings['software']['kubernetes'],
           'CRIO_VERSION'       => settings['software']['crio'],
-          'OS'                 => settings['software']['os'],
-          'CONTROL_IP'         => settings['network']['control_ip'],
           'SETUP_LOG'          => '/var/log/k8s-setup.log'
         },
         path: 'scripts/common.sh'
 
       node.vm.provision 'shell',
-        env: {
-          'CONTROL_IP' => settings['network']['control_ip']
-        },
         path: 'scripts/node.sh'
-    end
-  end
-
-  # ==============================
-  # === Post-Cluster Health Check
-  # ==============================
-  config.trigger.after [:up, :reload] do |trigger|
-    trigger.name = "Verifying cluster health"
-    trigger.ruby do |_env, _machine|
-      system <<~SHELL
-        echo "Checking cluster status..."
-        vagrant ssh control-plane -c "kubectl get nodes -o wide"
-        vagrant ssh control-plane -c "kubectl get pods -A"
-        vagrant ssh control-plane -c "kubectl wait --for=condition=Ready nodes --all --timeout=300s"
-      SHELL
     end
   end
 end
