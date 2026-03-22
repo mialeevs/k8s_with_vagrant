@@ -6,13 +6,16 @@ A production-ready Kubernetes cluster setup using Vagrant, Parallels Desktop, CR
 
 ### Required Software
 
-Install the following on your Mac:
+Install Xcode Command Line Tools (provides `make`, `git`, and other essentials):
+```bash
+xcode-select --install
+```
+
+Then install the following:
 
 > [Parallels Desktop](https://www.parallels.com/)
 
 > [Vagrant](https://www.vagrantup.com/) - Version 2.3.0 or higher
-
-> [GIT](https://git-scm.com/)
 
 ### System Requirements
 
@@ -63,7 +66,7 @@ make up
 
 This will:
 1. Validate `settings.yaml` configuration
-2. Create all VMs in parallel (control plane + workers simultaneously)
+2. Create all VMs sequentially without provisioning
 3. Provision the control plane first (Kubernetes init, Calico, ArgoCD, Helm)
 4. Provision each worker node sequentially (join cluster, install node exporter)
 

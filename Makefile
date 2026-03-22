@@ -9,8 +9,8 @@ help: ## Show this help message
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  %-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 up: ## Start the Kubernetes cluster
-	@echo "==> Creating all VMs in parallel (no provisioning)..."
-	vagrant up --no-provision --parallel
+	@echo "==> Creating all VMs (no provisioning)..."
+	vagrant up --no-provision
 	@echo "==> Provisioning control-plane..."
 	vagrant provision control-plane
 	@echo "==> Provisioning worker nodes sequentially..."
@@ -29,7 +29,7 @@ destroy: ## Destroy the cluster completely
 	vagrant destroy -f
 
 reload: ## Reload cluster configuration
-	@echo "Reloading cluster (no provisioning)..."
+	@echo "Reloading cluster..."
 	vagrant reload --no-provision
 	@echo "==> Re-provisioning control-plane..."
 	vagrant provision control-plane
