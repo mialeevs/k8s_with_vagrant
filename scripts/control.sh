@@ -160,8 +160,33 @@ install_calico() {
 }
 
 install_tools() {
-    log "INFO" "Installing Helm and ArgoCD CLI..."
-    apt-get install -y unzip curl wget bash-completion
+    log "INFO" "Installing necessary tool, Helm and ArgoCD CLI..."
+    apt-get install -y unzip curl wget bash-completion zsh
+    chsh -s /bin/zsh vagrant
+
+    # Configure zsh for vagrant user
+    cat > /home/vagrant/.zshrc <<'ZSHEOF'
+# Completions
+autoload -Uz compinit && compinit
+source <(kubectl completion zsh)
+source <(helm completion zsh)
+compdef __start_kubectl k
+
+# Aliases
+alias k=kubectl
+alias c=clear
+
+# Prompt
+autoload -Uz promptinit && promptinit
+PS1='%n@%m:%~$ '
+
+# History
+HISTFILE=~/.zsh_history
+HISTSIZE=10000
+SAVEHIST=10000
+setopt SHARE_HISTORY
+ZSHEOF
+    chown vagrant:vagrant /home/vagrant/.zshrc
 
     # Helm
     curl -fsSL -o "${TEMP_DIR}/get_helm.sh" https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
@@ -169,14 +194,15 @@ install_tools() {
     VERIFY_CHECKSUM=true "${TEMP_DIR}/get_helm.sh"
 
     # ArgoCD CLI
-    wget -q https://github.com/argoproj/argo-cd/releases/download/v2.13.2/argocd-linux-amd64 -O "${TEMP_DIR}/argocd"
+    kubectl create namespace argocd
+    wget -q https://github.com/argoproj/argo-cd/releases/download/v3.3.4/argocd-linux-arm64 -O "${TEMP_DIR}/argocd"
     install -m 755 "${TEMP_DIR}/argocd" /usr/local/bin/argocd
 }
 
 install_argocd() {
     log "INFO" "Installing ArgoCD..."
     kubectl create namespace argocd || true
-    kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/v2.13.2/manifests/install.yaml
+    kubectl apply -n argocd --server-side --force-conflicts -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
     kubectl patch svc argocd-server -n argocd -p '{"spec":{"type":"NodePort"}}'
     kubectl patch svc argocd-server -n argocd --type='json' \
         -p='[{"op":"replace","path":"/spec/ports/0/nodePort","value":30903},{"op":"replace","path":"/spec/ports/1/nodePort","value":30904}]'
