@@ -103,10 +103,12 @@ kubectl get nodes
 - **Kubernetes**: v1.34
 - **Container Runtime**: CRI-O v1.35
 - **CNI**: Calico v3.28.2
+- **OS**: Ubuntu 24.04 (bento/ubuntu-24.04)
 
 ### Additional Tools
-- **ArgoCD**: v2.13.2 (GitOps)
+- **ArgoCD**: v3.3.4 (GitOps)
 - **Helm**: v3 (Package Manager)
+- **Node Exporter**: v1.8.2 (Metrics)
 
 ## ArgoCD Access
 
@@ -266,8 +268,9 @@ make reload
 Edit `settings.yaml`:
 ```yaml
 software:
-  kubernetes: v1.34  # Change to desired version
-  crio: v1.35        # Should match or be compatible with Kubernetes version
+  kubernetes: v1.34   # Change to desired version
+  crio: v1.35         # Should match or be compatible with Kubernetes version
+  calico: v3.28.2     # CNI plugin version
 ```
 
 ### Add More Workers
