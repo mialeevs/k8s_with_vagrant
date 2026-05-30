@@ -3,8 +3,8 @@ environment: development
 
 network:
   dns_servers:
+    - 9.9.9.11
     - 1.1.1.1
-    - 8.8.8.8
   pod_cidr: 10.244.0.0/16
   service_cidr: 10.96.0.0/12
   control_ip: 192.168.1.100
@@ -22,7 +22,7 @@ nodes:
 
 software:
   box: bento/ubuntu-24.04
-  kubernetes: v1.34
+  kubernetes: v1.35
   crio: v1.35
   calico: v3.28.2
   os: xUbuntu_24.04

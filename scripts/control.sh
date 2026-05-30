@@ -189,7 +189,7 @@ ZSHEOF
     chown vagrant:vagrant /home/vagrant/.zshrc
 
     # Helm
-    curl -fsSL -o "${TEMP_DIR}/get_helm.sh" https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+    curl -fsSL -o "${TEMP_DIR}/get_helm.sh" https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-4
     chmod 700 "${TEMP_DIR}/get_helm.sh"
     VERIFY_CHECKSUM=true "${TEMP_DIR}/get_helm.sh"
 
@@ -214,7 +214,7 @@ main() {
     initialize_control_plane
     install_calico
     install_tools
-    install_argocd
+    # install_argocd
     log "INFO" "Control plane setup completed successfully"
     chmod 644 "${SETUP_LOG}"
 }
