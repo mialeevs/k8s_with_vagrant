@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -euo pipefail
+set -euxo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
 readonly CONFIG_PATH="/vagrant/configs"
@@ -82,15 +82,19 @@ install_node_exporter() {
     log "INFO" "Installing Node Exporter..."
 
     local VERSION="1.8.2"
+    local ARCH
+    ARCH=$(dpkg --print-architecture)  # e.g. arm64 or amd64
 
-    curl -4 -fsSL \
-      "https://github.com/prometheus/node_exporter/releases/download/v${VERSION}/node_exporter-${VERSION}.linux-amd64.tar.gz" \
+    log "INFO" "Detected architecture: ${ARCH}"
+
+    curl -4 -fL --progress-bar \
+      "https://github.com/prometheus/node_exporter/releases/download/v${VERSION}/node_exporter-${VERSION}.linux-${ARCH}.tar.gz" \
       -o "${TEMP_DIR}/node_exporter.tar.gz"
 
-    tar xf "${TEMP_DIR}/node_exporter.tar.gz" -C "${TEMP_DIR}"
+    tar xvf "${TEMP_DIR}/node_exporter.tar.gz" -C "${TEMP_DIR}"
 
     install -m 755 \
-      "${TEMP_DIR}/node_exporter-${VERSION}.linux-amd64/node_exporter" \
+      "${TEMP_DIR}/node_exporter-${VERSION}.linux-${ARCH}/node_exporter" \
       /usr/local/bin/node_exporter
 
     id node_exporter &>/dev/null || useradd -rs /bin/false node_exporter
