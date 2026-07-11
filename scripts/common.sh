@@ -23,12 +23,26 @@ for var in "${required_vars[@]}"; do
 done
 
 # ----------------------------
-# Disable swap
+# Disable swap permanently
 # ----------------------------
 disable_swap() {
-    log "INFO" "Disabling swap..."
+    log "INFO" "Disabling swap permanently..."
     swapoff -a || true
-    sed -i '/ swap / s/^/#/' /etc/fstab
+
+    # Remove swap entries from fstab
+    sed -i '/\sswap\s/d' /etc/fstab
+
+    # Remove the swap file if it exists
+    rm -f /swap.img
+
+    # Disable any systemd swap units
+    systemctl mask "dev-*.swap" 2>/dev/null || true
+    for unit in $(systemctl list-unit-files --type=swap --no-legend | awk '{print $1}'); do
+        systemctl stop "$unit" 2>/dev/null || true
+        systemctl mask "$unit" 2>/dev/null || true
+    done
+
+    log "INFO" "Swap disabled permanently"
 }
 
 # ----------------------------
