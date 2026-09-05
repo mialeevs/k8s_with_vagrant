@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -euo pipefail
+set -euxo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
 readonly CONFIG_PATH="/vagrant/configs"
@@ -8,6 +8,8 @@ readonly SETUP_LOG="/var/log/k8s-worker-setup.log"
 readonly MAX_RETRIES=5
 readonly RETRY_DELAY=10
 readonly TEMP_DIR=$(mktemp -d)
+readonly CONTROL_IP="${CONTROL_IP:-192.168.1.100}"
+readonly CLUSTER_TOKEN="${CLUSTER_TOKEN:-abcdef.0123456789abcdef}"
 
 trap 'rm -rf "${TEMP_DIR}"' EXIT
 
@@ -27,11 +29,6 @@ cleanup_on_failure() {
 trap 'cleanup_on_failure $LINENO' ERR
 
 verify_environment() {
-    if [ ! -f "${CONFIG_PATH}/join.sh" ]; then
-        log "ERROR" "Join script not found at ${CONFIG_PATH}/join.sh"
-        exit 1
-    fi
-
     if ! systemctl is-active --quiet crio; then
         log "ERROR" "CRI-O is not running"
         exit 1
@@ -58,13 +55,22 @@ join_cluster() {
         return
     fi
 
-    log "INFO" "Joining Kubernetes cluster..."
+    log "INFO" "Joining Kubernetes cluster at ${CONTROL_IP}:6443..."
 
-    chmod 755 "${CONFIG_PATH}/join.sh"
-
+    # Build the join command from the fixed bootstrap token rather than the
+    # synced join.sh. Because /vagrant/configs is a one-way host->guest rsync
+    # share, join.sh generated on the control plane never reaches the host and
+    # workers would otherwise pick up a stale token. The fixed token is
+    # registered by the control plane (see control.sh).
+    #
+    # CA verification is skipped because the worker cannot know the current CA
+    # cert hash from a static token alone. This is acceptable for a local dev
+    # cluster; for a hardened setup, pass the CA hash explicitly instead.
     local attempt=1
     while [ $attempt -le $MAX_RETRIES ]; do
-        if bash "${CONFIG_PATH}/join.sh"; then
+        if kubeadm join "${CONTROL_IP}:6443" \
+            --token "${CLUSTER_TOKEN}" \
+            --discovery-token-unsafe-skip-ca-verification; then
             log "INFO" "Successfully joined cluster"
             return
         fi
@@ -82,15 +88,19 @@ install_node_exporter() {
     log "INFO" "Installing Node Exporter..."
 
     local VERSION="1.8.2"
+    local ARCH
+    ARCH=$(dpkg --print-architecture)  # e.g. arm64 or amd64
 
-    curl -4 -fsSL \
-      "https://github.com/prometheus/node_exporter/releases/download/v${VERSION}/node_exporter-${VERSION}.linux-amd64.tar.gz" \
+    log "INFO" "Detected architecture: ${ARCH}"
+
+    curl -4 -fL --progress-bar \
+      "https://github.com/prometheus/node_exporter/releases/download/v${VERSION}/node_exporter-${VERSION}.linux-${ARCH}.tar.gz" \
       -o "${TEMP_DIR}/node_exporter.tar.gz"
 
-    tar xf "${TEMP_DIR}/node_exporter.tar.gz" -C "${TEMP_DIR}"
+    tar xvf "${TEMP_DIR}/node_exporter.tar.gz" -C "${TEMP_DIR}"
 
     install -m 755 \
-      "${TEMP_DIR}/node_exporter-${VERSION}.linux-amd64/node_exporter" \
+      "${TEMP_DIR}/node_exporter-${VERSION}.linux-${ARCH}/node_exporter" \
       /usr/local/bin/node_exporter
 
     id node_exporter &>/dev/null || useradd -rs /bin/false node_exporter

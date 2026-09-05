@@ -3,13 +3,19 @@ environment: development
 
 network:
   dns_servers:
+    - 9.9.9.11
     - 1.1.1.1
-    - 8.8.8.8
   pod_cidr: 10.244.0.0/16
   service_cidr: 10.96.0.0/12
   control_ip: 192.168.1.100
   worker_ip_prefix: 192.168.1
   worker_start_ip: 11
+  # Fixed bootstrap token for worker joins. Because /vagrant/configs is a
+  # one-way (host -> guest) rsync share, a join.sh generated on the control
+  # plane never syncs back to the host, so workers would get a stale token.
+  # A fixed token that the control plane registers and workers consume removes
+  # that dependency. Format: [a-z0-9]{6}.[a-z0-9]{16}
+  cluster_token: abcdef.0123456789abcdef
 
 nodes:
   control:
@@ -18,13 +24,13 @@ nodes:
   workers:
     count: 1
     cpu: 2
-    memory: 6144
+    memory: 4096
 
 software:
-  box: bento/ubuntu-24.04
-  kubernetes: v1.34
-  crio: v1.35
-  calico: v3.28.2
+  box: bento/ubuntu-26.04
+  kubernetes: v1.36
+  crio: v1.36
+  calico: v3.32.1
   os: xUbuntu_24.04
 
 shared_folders:

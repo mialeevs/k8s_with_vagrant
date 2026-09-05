@@ -1,7 +1,7 @@
 require 'yaml'
 
 def load_settings
-  YAML.safe_load(File.read('settings.yaml'), aliases: true)
+  YAML.safe_load(File.read(File.join(__dir__, 'settings.yaml')), aliases: true)
 end
 
 Vagrant.configure("2") do |config|
@@ -18,8 +18,14 @@ Vagrant.configure("2") do |config|
   config.vm.synced_folder '.', '/vagrant', disabled: true
 
   # === Dynamic Shared Folders ===
+  # Use rsync instead of the native Parallels prl_fs/prl_fsd mount.
+  # Recent Parallels Tools bundle libfuse3, which removed the "big_writes"
+  # mount option that vagrant-parallels still passes, breaking native mounts
+  # with: fuse: unknown option(s): `-o big_writes'
   Array(settings["shared_folders"]).each do |folder|
     config.vm.synced_folder folder["host_path"], folder["vm_path"],
+      type: "rsync",
+      rsync__args: ["--archive", "--delete", "--compress"],
       owner: folder["owner"],
       group: folder["group"]
   end
@@ -52,7 +58,8 @@ Vagrant.configure("2") do |config|
         'CALICO_VERSION' => settings['software']['calico'],
         'POD_CIDR'       => settings['network']['pod_cidr'],
         'SERVICE_CIDR'   => settings['network']['service_cidr'],
-        'CONTROL_IP'     => settings['network']['control_ip']
+        'CONTROL_IP'     => settings['network']['control_ip'],
+        'CLUSTER_TOKEN'  => settings['network']['cluster_token']
       },
       path: 'scripts/control.sh'
   end
@@ -89,6 +96,10 @@ Vagrant.configure("2") do |config|
         path: 'scripts/common.sh'
 
       node.vm.provision 'shell',
+        env: {
+          'CONTROL_IP'    => settings['network']['control_ip'],
+          'CLUSTER_TOKEN' => settings['network']['cluster_token']
+        },
         path: 'scripts/node.sh'
     end
   end

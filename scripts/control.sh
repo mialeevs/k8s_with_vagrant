@@ -11,6 +11,7 @@ CALICO_VERSION=${CALICO_VERSION:-"v3.28.2"}
 CONTROL_IP=${CONTROL_IP:-"192.168.1.100"}
 POD_CIDR=${POD_CIDR:-"10.244.0.0/16"}
 SERVICE_CIDR=${SERVICE_CIDR:-"10.96.0.0/12"}
+CLUSTER_TOKEN=${CLUSTER_TOKEN:-"abcdef.0123456789abcdef"}
 
 trap 'rm -rf "${TEMP_DIR}"' EXIT
 
@@ -132,10 +133,24 @@ EOF
 
     wait_for_apiserver
 
-    # Generate join script for workers
+    # Register the fixed bootstrap token that workers will use to join, and
+    # capture the full join command (which includes the current CA cert hash).
+    #
+    # A fixed token (from settings.yaml) is used instead of a random one
+    # because /vagrant/configs is a one-way host->guest rsync share, so a
+    # randomly generated join.sh never syncs back to the host for workers.
+    # The token is given a long TTL so it stays valid for the whole cluster
+    # bring-up (and later manual joins during a dev session).
+    log "INFO" "Registering fixed bootstrap token for worker joins..."
+    local join_command
+    join_command=$(kubeadm token create "${CLUSTER_TOKEN}" --ttl 24h0m0s --print-join-command)
+
+    # Write join.sh for convenience/manual use. Workers no longer depend on
+    # this file (they build the join command from the fixed token), but it is
+    # handy for manually adding nodes.
     log "INFO" "Generating worker join script..."
     mkdir -p "${CONFIG_PATH}"
-    kubeadm token create --print-join-command > "${CONFIG_PATH}/join.sh"
+    echo "${join_command}" > "${CONFIG_PATH}/join.sh"
     chmod 755 "${CONFIG_PATH}/join.sh"
 
     cat >> /home/vagrant/.bashrc <<'EOF'
@@ -160,23 +175,49 @@ install_calico() {
 }
 
 install_tools() {
-    log "INFO" "Installing Helm and ArgoCD CLI..."
-    apt-get install -y unzip curl wget bash-completion
+    log "INFO" "Installing necessary tool, Helm and ArgoCD CLI..."
+    apt-get install -y unzip curl wget bash-completion zsh
+    chsh -s /bin/zsh vagrant
+
+    # Configure zsh for vagrant user
+    cat > /home/vagrant/.zshrc <<'ZSHEOF'
+# Completions
+autoload -Uz compinit && compinit
+source <(kubectl completion zsh)
+source <(helm completion zsh)
+compdef __start_kubectl k
+
+# Aliases
+alias k=kubectl
+alias c=clear
+
+# Prompt
+autoload -Uz promptinit && promptinit
+PS1='%n@%m:%~$ '
+
+# History
+HISTFILE=~/.zsh_history
+HISTSIZE=10000
+SAVEHIST=10000
+setopt SHARE_HISTORY
+ZSHEOF
+    chown vagrant:vagrant /home/vagrant/.zshrc
 
     # Helm
-    curl -fsSL -o "${TEMP_DIR}/get_helm.sh" https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+    curl -fsSL -o "${TEMP_DIR}/get_helm.sh" https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-4
     chmod 700 "${TEMP_DIR}/get_helm.sh"
     VERIFY_CHECKSUM=true "${TEMP_DIR}/get_helm.sh"
 
     # ArgoCD CLI
-    wget -q https://github.com/argoproj/argo-cd/releases/download/v2.13.2/argocd-linux-amd64 -O "${TEMP_DIR}/argocd"
+    kubectl create namespace argocd
+    wget -q https://github.com/argoproj/argo-cd/releases/download/v3.3.4/argocd-linux-arm64 -O "${TEMP_DIR}/argocd"
     install -m 755 "${TEMP_DIR}/argocd" /usr/local/bin/argocd
 }
 
 install_argocd() {
     log "INFO" "Installing ArgoCD..."
     kubectl create namespace argocd || true
-    kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/v2.13.2/manifests/install.yaml
+    kubectl apply -n argocd --server-side --force-conflicts -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
     kubectl patch svc argocd-server -n argocd -p '{"spec":{"type":"NodePort"}}'
     kubectl patch svc argocd-server -n argocd --type='json' \
         -p='[{"op":"replace","path":"/spec/ports/0/nodePort","value":30903},{"op":"replace","path":"/spec/ports/1/nodePort","value":30904}]'
@@ -188,7 +229,7 @@ main() {
     initialize_control_plane
     install_calico
     install_tools
-    install_argocd
+    # install_argocd
     log "INFO" "Control plane setup completed successfully"
     chmod 644 "${SETUP_LOG}"
 }

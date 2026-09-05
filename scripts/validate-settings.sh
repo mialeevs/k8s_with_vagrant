@@ -125,6 +125,16 @@ if [ -n "$ctrl_mem" ] && [ "$ctrl_mem" -lt 2048 ] 2>/dev/null; then
 fi
 
 # ----------------------------
+# Validate cluster_token format (kubeadm: [a-z0-9]{6}.[a-z0-9]{16})
+# ----------------------------
+cluster_token=$(get "cluster_token")
+if [ -z "$cluster_token" ]; then
+    err "Missing required field: cluster_token"
+elif ! [[ "$cluster_token" =~ ^[a-z0-9]{6}\.[a-z0-9]{16}$ ]]; then
+    err "Invalid cluster_token format: '$cluster_token' (expected [a-z0-9]{6}.[a-z0-9]{16})"
+fi
+
+# ----------------------------
 # Validate provisioning scripts exist
 # ----------------------------
 for script in scripts/common.sh scripts/control.sh scripts/node.sh; do
