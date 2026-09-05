@@ -11,6 +11,7 @@ CALICO_VERSION=${CALICO_VERSION:-"v3.28.2"}
 CONTROL_IP=${CONTROL_IP:-"192.168.1.100"}
 POD_CIDR=${POD_CIDR:-"10.244.0.0/16"}
 SERVICE_CIDR=${SERVICE_CIDR:-"10.96.0.0/12"}
+CLUSTER_TOKEN=${CLUSTER_TOKEN:-"abcdef.0123456789abcdef"}
 
 trap 'rm -rf "${TEMP_DIR}"' EXIT
 
@@ -132,10 +133,24 @@ EOF
 
     wait_for_apiserver
 
-    # Generate join script for workers
+    # Register the fixed bootstrap token that workers will use to join, and
+    # capture the full join command (which includes the current CA cert hash).
+    #
+    # A fixed token (from settings.yaml) is used instead of a random one
+    # because /vagrant/configs is a one-way host->guest rsync share, so a
+    # randomly generated join.sh never syncs back to the host for workers.
+    # The token is given a long TTL so it stays valid for the whole cluster
+    # bring-up (and later manual joins during a dev session).
+    log "INFO" "Registering fixed bootstrap token for worker joins..."
+    local join_command
+    join_command=$(kubeadm token create "${CLUSTER_TOKEN}" --ttl 24h0m0s --print-join-command)
+
+    # Write join.sh for convenience/manual use. Workers no longer depend on
+    # this file (they build the join command from the fixed token), but it is
+    # handy for manually adding nodes.
     log "INFO" "Generating worker join script..."
     mkdir -p "${CONFIG_PATH}"
-    kubeadm token create --print-join-command > "${CONFIG_PATH}/join.sh"
+    echo "${join_command}" > "${CONFIG_PATH}/join.sh"
     chmod 755 "${CONFIG_PATH}/join.sh"
 
     cat >> /home/vagrant/.bashrc <<'EOF'
